@@ -4,27 +4,95 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Teachable Machine → Game Character</title>
-  <!-- TensorFlow.js 먼저 로드 -->
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
 
-<!-- 그 다음 Teachable Machine Image 라이브러리 로드 -->
-<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+  <!-- 호환되는 TF.js 1.3.1 + Teachable Machine 0.8 -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
 
   <style>
-    :root{--ground:#6b8f4a}
-    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(#87ceeb,#bfe9ff);height:100vh;display:flex;flex-direction:column;align-items:center}
-    header{padding:12px;text-align:center}
-    #stage{position:relative;width:900px;height:360px;background:linear-gradient(#9eea9e,#6ee97e);border-radius:10px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.15)}
-    #ground{position:absolute;left:0;right:0;bottom:0;height:80px;background:var(--ground)}
-    #character{position:absolute;left:50%;bottom:80px;width:72px;height:96px;margin-left:-36px;transition:left 0.12s linear, transform 0.24s ease;will-change:left,transform}
-    #character img{width:100%;height:100%;display:block}
-    #hud{display:flex;gap:12px;padding:12px;align-items:center}
-    #video {border-radius:6px;transform:scaleX(-1)}
-    #controls{margin-left:auto}
-    button{padding:8px 12px;border-radius:8px;border:0;background:#0b74de;color:white;cursor:pointer}
-    .status{font-weight:600}
-    footer{font-size:13px;padding:10px;color:#043}
-    @media(max-width:980px){#stage{width:95%}#hud{flex-direction:column;align-items:flex-start}}
+    :root { --ground: #6b8f4a; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      /* 게임 배경 이미지 */
+      background: url('https://cdn.pixabay.com/photo/2017/08/30/01/05/milky-way-2695569_1280.jpg') center/cover no-repeat;
+      color: white;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    }
+    header { padding: 12px; text-align: center; }
+    h1 { margin: 0; font-size: 1.8rem; }
+    p { margin: 8px 0 0; }
+
+    #stage {
+      position: relative;
+      width: 900px;
+      height: 360px;
+      background: linear-gradient(to bottom, #87CEEB, #E0F7FA);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,.3);
+      margin-top: 12px;
+    }
+    #ground {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 80px;
+      background: var(--ground);
+    }
+    #character {
+      position: absolute;
+      left: 50%;
+      bottom: 80px;
+      width: 72px;
+      height: 96px;
+      margin-left: -36px;
+      transition: left 0.12s linear, transform 0.24s ease;
+      will-change: left, transform;
+    }
+    #character img { width: 100%; height: 100%; display: block; }
+
+    #hud {
+      display: flex;
+      gap: 12px;
+      padding: 12px;
+      align-items: center;
+      background: rgba(0,0,0,0.4);
+      border-radius: 8px;
+      margin: 8px;
+    }
+    #video {
+      border-radius: 6px;
+      transform: scaleX(-1);
+      border: 2px solid #fff;
+    }
+    #controls { margin-left: auto; }
+    button {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 0;
+      background: #0b74de;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:disabled { background: #555; cursor: not-allowed; }
+    .status { font-weight: 600; color: #0f0; }
+
+    footer {
+      font-size: 13px;
+      padding: 10px;
+      color: #ddd;
+      text-align: center;
+    }
+
+    @media (max-width: 980px) {
+      #stage { width: 95%; }
+      #hud { flex-direction: column; align-items: flex-start; }
+    }
   </style>
 </head>
 <body>
@@ -34,9 +102,7 @@
   </header>
 
   <div id="hud">
-    <div>
-      <video id="video" width="320" height="240" autoplay playsinline muted></video>
-    </div>
+    <div><video id="video" width="320" height="240" autoplay playsinline muted></video></div>
     <div id="controls">
       <button id="startBtn">Start webcam & model</button>
       <button id="stopBtn" disabled>Stop</button>
@@ -54,25 +120,17 @@
       </div>
       <div id="ground"></div>
     </div>
-
-    <div style="max-width:900px;text-align:center">Deploy on GitHub Pages: put this file (<code>index.html</code>) in your repository root and enable GitHub Pages (branch: main). Make sure to access via <strong>HTTPS</strong> so the webcam works.</div>
+    <div style="max-width:900px;text-align:center;color:#ccc;">
+      Deploy on GitHub Pages: put this file (<code>index.html</code>) in your repository root and enable GitHub Pages (branch: main). Use <strong>HTTPS</strong>.
+    </div>
   </main>
 
-  <footer>Model URL used: <code>https://teachablemachine.withgoogle.com/models/UGWuItBRh/</code></footer>
+  <footer>Model URL: <code>https://teachablemachine.withgoogle.com/models/UGWuItBRh/</code></footer>
 
-  <!-- ✅ Load Teachable Machine library first -->
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image/dist/teachablemachine-image.min.js"></script>
-
-  <!-- ✅ Main script -->
   <script>
     const MODEL_URL = 'https://teachablemachine.withgoogle.com/models/UGWuItBRh/';
-    const CLASS_LEFT = 'left';
-    const CLASS_RIGHT = 'right';
-    const CLASS_STAY = 'stay';
-    const CLASS_JUMP = 'jump';
-
-    const SPEED = 6;
-    const SMOOTH_WINDOW = 7;
+    const CLASS_LEFT = 'left', CLASS_RIGHT = 'right', CLASS_STAY = 'stay', CLASS_JUMP = 'jump';
+    const SPEED = 6, SMOOTH_WINDOW = 7;
 
     const video = document.getElementById('video');
     const startBtn = document.getElementById('startBtn');
@@ -82,24 +140,22 @@
     const character = document.getElementById('character');
     const stage = document.getElementById('stage');
 
-    let model, maxPredictions;
-    let stream = null;
-    let predictionHistory = [];
-    let running = false;
-    let x = stage.clientWidth / 2 - character.clientWidth / 2;
-    let vy = 0;
-    let onGround = true;
+    let model, stream, predictionHistory = [], running = false;
+    let x = 0, vy = 0, onGround = true;
+    character._y = 0;
+
+    // 초기 위치 설정 (DOM 로드 후)
+    function initPosition() {
+      x = stage.clientWidth / 2 - 36;
+      character.style.left = x + 'px';
+    }
 
     async function loadModel() {
-      if (!window.tmImage) {
-        alert('Teachable Machine library failed to load.');
-        throw new Error('tmImage undefined');
-      }
+      if (!window.tmImage) throw new Error('tmImage undefined');
       const modelURL = MODEL_URL + 'model.json';
       const metadataURL = MODEL_URL + 'metadata.json';
       model = await tmImage.load(modelURL, metadataURL);
-      maxPredictions = model.getTotalClasses();
-      console.log('Model loaded', maxPredictions);
+      console.log('Model loaded');
     }
 
     async function startWebcam() {
@@ -109,31 +165,50 @@
     }
 
     function stopWebcam() {
-      if (!stream) return;
-      stream.getTracks().forEach(t => t.stop());
+      if (stream) stream.getTracks().forEach(t => t.stop());
       video.srcObject = null;
       stream = null;
     }
 
     function mostFrequent(arr) {
-      if (arr.length === 0) return null;
       const counts = {};
       let best = null, bestCount = 0;
       for (const v of arr) {
         counts[v] = (counts[v] || 0) + 1;
-        if (counts[v] > bestCount) {
-          bestCount = counts[v];
-          best = v;
-        }
+        if (counts[v] > bestCount) { bestCount = counts[v]; best = v; }
       }
       return best;
     }
 
+    function handleInput(action, confidence = 1) {
+      if (confidence < 0.35) action = CLASS_STAY;
+
+      if (action === CLASS_LEFT) x -= SPEED;
+      if (action === CLASS_RIGHT) x += SPEED;
+      if (action === CLASS_JUMP && onGround) { vy = -12; onGround = false; }
+    }
+
+    function updatePhysics() {
+      vy += 0.6;
+      character._y = Math.max(-220, character._y + vy);
+
+      if (character._y > 0) {
+        character._y = 0;
+        vy = 0;
+        onGround = true;
+      }
+
+      // 경계 제한
+      x = Math.max(8, Math.min(stage.clientWidth - 80, x));
+      character.style.left = x + 'px';
+      character.style.transform = `translateY(${character._y}px)`;
+    }
+
     async function predictLoop() {
       if (!running) return;
+
       const prediction = await model.predict(video);
-      let top = prediction[0];
-      for (const p of prediction) if (p.probability > top.probability) top = p;
+      const top = prediction.reduce((a, b) => a.probability > b.probability ? a : b);
 
       predictionHistory.push(top.className);
       if (predictionHistory.length > SMOOTH_WINDOW) predictionHistory.shift();
@@ -142,43 +217,10 @@
       predLabel.textContent = smoothed || '—';
       confLabel.textContent = (top.probability * 100).toFixed(1) + '%';
 
-      handleAction(smoothed, top.probability);
+      handleInput(smoothed, top.probability);
+      updatePhysics();
 
       requestAnimationFrame(predictLoop);
-    }
-
-    function handleAction(action, confidence) {
-      if (confidence < 0.35) action = CLASS_STAY;
-
-      if (action === CLASS_LEFT) {
-        x = Math.max(8, x - SPEED);
-      } else if (action === CLASS_RIGHT) {
-        x = Math.min(stage.clientWidth - character.clientWidth - 8, x + SPEED);
-      }
-
-      if (action === CLASS_JUMP && onGround) {
-        vy = -12;
-        onGround = false;
-      }
-
-      vy += 0.6;
-      if (!character._y) character._y = 0;
-      character._y += vy;
-      if (character._y > 0) {
-        character._y = 0;
-        vy = 0;
-        onGround = true;
-      }
-      if (character._y < -220) character._y = -220;
-
-      character.style.left = x + 'px';
-      character.style.transform = `translateY(${character._y}px)`;
-    }
-
-    function tick() {
-      x = Math.max(8, Math.min(stage.clientWidth - character.clientWidth - 8, x));
-      character.style.left = x + 'px';
-      requestAnimationFrame(tick);
     }
 
     startBtn.addEventListener('click', async () => {
@@ -187,14 +229,14 @@
       try {
         await loadModel();
         await startWebcam();
+        initPosition();
         running = true;
         stopBtn.disabled = false;
         predictionHistory = [];
         predictLoop();
-        tick();
       } catch (err) {
         console.error(err);
-        alert('Error starting webcam or loading model: ' + err.message);
+        alert('Error: ' + err.message);
         startBtn.disabled = false;
       }
     });
@@ -203,22 +245,21 @@
       running = false;
       stopBtn.disabled = true;
       startBtn.disabled = false;
-      predLabel.textContent = '—';
-      confLabel.textContent = '—';
+      predLabel.textContent = confLabel.textContent = '—';
       predictionHistory = [];
       stopWebcam();
     });
 
-    window.addEventListener('resize', () => {
-      x = Math.max(8, Math.min(stage.clientWidth - character.clientWidth - 8, x));
+    window.addEventListener('resize', initPosition);
+    window.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft') handleInput(CLASS_LEFT);
+      if (e.key === 'ArrowRight') handleInput(CLASS_RIGHT);
+      if (e.key === ' ' || e.key === 'ArrowUp') handleInput(CLASS_JUMP);
+      if (e.key === 'ArrowDown') handleInput(CLASS_STAY);
     });
 
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft') handleAction(CLASS_LEFT, 1);
-      if (e.key === 'ArrowRight') handleAction(CLASS_RIGHT, 1);
-      if (e.key === ' ' || e.key === 'ArrowUp') handleAction(CLASS_JUMP, 1);
-      if (e.key === 'ArrowDown') handleAction(CLASS_STAY, 1);
-    });
+    // DOM 로드 후 초기화
+    window.addEventListener('load', initPosition);
   </script>
 </body>
 </html>
