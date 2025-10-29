@@ -18,7 +18,6 @@
     button{padding:8px 12px;border-radius:8px;border:0;background:#0b74de;color:white;cursor:pointer}
     .status{font-weight:600}
     footer{font-size:13px;padding:10px;color:#043}
-    /* small screens */
     @media(max-width:980px){#stage{width:95%}#hud{flex-direction:column;align-items:flex-start}}
   </style>
 </head>
@@ -45,31 +44,30 @@
   <main style="padding:12px;display:flex;gap:12px;flex-direction:column;align-items:center;width:100%">
     <div id="stage" aria-label="game stage">
       <div id="character" aria-hidden="true">
-        <!-- simple sprite — you can replace with your own image -->
         <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='72' height='96'><rect rx='12' ry='12' width='72' height='96' fill='%23ffb86b'/><circle cx='36' cy='28' r='12' fill='%23fff'/><rect x='20' y='60' width='12' height='20' rx='4' ry='4' fill='%23666'/><rect x='40' y='60' width='12' height='20' rx='4' ry='4' fill='%23666'/></svg>" alt="game character"/>
       </div>
       <div id="ground"></div>
     </div>
 
-    <div style="max-width:900px;text-align:center">Deploy on GitHub Pages: put this file (e.g. <code>index.html</code>) in the repository root and enable GitHub Pages (branch: main). Use HTTPS when loading the model.</div>
+    <div style="max-width:900px;text-align:center">Deploy on GitHub Pages: put this file (<code>index.html</code>) in your repository root and enable GitHub Pages (branch: main). Make sure to access via <strong>HTTPS</strong> so the webcam works.</div>
   </main>
 
   <footer>Model URL used: <code>https://teachablemachine.withgoogle.com/models/UGWuItBRh/</code></footer>
 
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+  <!-- ✅ Load Teachable Machine library first -->
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image/dist/teachablemachine-image.min.js"></script>
+
+  <!-- ✅ Main script -->
   <script>
-    // ---- CONFIG ----
     const MODEL_URL = 'https://teachablemachine.withgoogle.com/models/UGWuItBRh/';
     const CLASS_LEFT = 'left';
     const CLASS_RIGHT = 'right';
     const CLASS_STAY = 'stay';
     const CLASS_JUMP = 'jump';
 
-    // movement config
-    const SPEED = 6; // pixels per frame when moving
-    const SMOOTH_WINDOW = 7; // predictions used for smoothing (odd number recommended)
+    const SPEED = 6;
+    const SMOOTH_WINDOW = 7;
 
-    // ---- DOM ----
     const video = document.getElementById('video');
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
@@ -82,112 +80,105 @@
     let stream = null;
     let predictionHistory = [];
     let running = false;
-    let x = stage.clientWidth/2 - character.clientWidth/2; // pixel x position
-    let vy = 0; // vertical velocity for jump
+    let x = stage.clientWidth / 2 - character.clientWidth / 2;
+    let vy = 0;
     let onGround = true;
 
-    // load model
-    async function loadModel(){
-      const url = MODEL_URL + 'model.json';
-      model = await tmImage.load(url, MODEL_URL + 'metadata.json');
+    async function loadModel() {
+      if (!window.tmImage) {
+        alert('Teachable Machine library failed to load.');
+        throw new Error('tmImage undefined');
+      }
+      const modelURL = MODEL_URL + 'model.json';
+      const metadataURL = MODEL_URL + 'metadata.json';
+      model = await tmImage.load(modelURL, metadataURL);
       maxPredictions = model.getTotalClasses();
       console.log('Model loaded', maxPredictions);
     }
 
-    // start webcam
-    async function startWebcam(){
-      stream = await navigator.mediaDevices.getUserMedia({video:{width:640,height:480}, audio:false});
+    async function startWebcam() {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
       video.srcObject = stream;
       await video.play();
     }
 
-    function stopWebcam(){
-      if(!stream) return;
-      stream.getTracks().forEach(t=>t.stop());
+    function stopWebcam() {
+      if (!stream) return;
+      stream.getTracks().forEach(t => t.stop());
       video.srcObject = null;
       stream = null;
     }
 
-    function mostFrequent(arr){
-      if(arr.length===0) return null;
+    function mostFrequent(arr) {
+      if (arr.length === 0) return null;
       const counts = {};
-      let best=null, bestCount=0;
-      for(const v of arr){ counts[v]=(counts[v]||0)+1; if(counts[v]>bestCount){bestCount=counts[v];best=v}};
+      let best = null, bestCount = 0;
+      for (const v of arr) {
+        counts[v] = (counts[v] || 0) + 1;
+        if (counts[v] > bestCount) {
+          bestCount = counts[v];
+          best = v;
+        }
+      }
       return best;
     }
 
-    async function predictLoop(){
-      if(!running) return;
-      const prediction = await model.predict(video, false);
-      // find top class
+    async function predictLoop() {
+      if (!running) return;
+      const prediction = await model.predict(video);
       let top = prediction[0];
-      for(const p of prediction) if(p.probability>top.probability) top = p;
+      for (const p of prediction) if (p.probability > top.probability) top = p;
 
-      // update history and smoothing
       predictionHistory.push(top.className);
-      if(predictionHistory.length>SMOOTH_WINDOW) predictionHistory.shift();
+      if (predictionHistory.length > SMOOTH_WINDOW) predictionHistory.shift();
       const smoothed = mostFrequent(predictionHistory);
 
-      // update HUD
       predLabel.textContent = smoothed || '—';
-      confLabel.textContent = (top.probability*100).toFixed(1) + '%';
+      confLabel.textContent = (top.probability * 100).toFixed(1) + '%';
 
-      // control character based on smoothed class
       handleAction(smoothed, top.probability);
 
       requestAnimationFrame(predictLoop);
     }
 
-    function handleAction(action, confidence){
-      // If confidence is very low, treat as stay
-      if(confidence < 0.35) action = CLASS_STAY;
+    function handleAction(action, confidence) {
+      if (confidence < 0.35) action = CLASS_STAY;
 
-      // horizontal movement
-      if(action === CLASS_LEFT){
+      if (action === CLASS_LEFT) {
         x = Math.max(8, x - SPEED);
-      } else if(action === CLASS_RIGHT){
+      } else if (action === CLASS_RIGHT) {
         x = Math.min(stage.clientWidth - character.clientWidth - 8, x + SPEED);
       }
 
-      // jump: apply upward velocity if on ground
-      if(action === CLASS_JUMP && onGround){
-        vy = -12; // negative = up
+      if (action === CLASS_JUMP && onGround) {
+        vy = -12;
         onGround = false;
       }
 
-      // physics step for jump/gravity
-      vy += 0.6; // gravity
-      let newBottom = parseFloat(getComputedStyle(character).bottom);
-      // convert bottom to pixel number
-      // we'll compute bottom from y position: bottom = groundHeight + ??? simpler: animate via transform
-
-      // update transform for position
-      character.style.left = x + 'px';
-      // vertical transform: simulate jump by changing translateY
-      // when vy positive and character near ground, place back
-      const stageHeight = stage.clientHeight;
-      // keep a simple y state stored on element
-      if(character._y === undefined) character._y = 0; // 0 means standing
+      vy += 0.6;
+      if (!character._y) character._y = 0;
       character._y += vy;
-      if(character._y > 0){ character._y = 0; vy = 0; onGround = true; }
-      // clamp weird values
-      if(character._y < -220) character._y = -220;
+      if (character._y > 0) {
+        character._y = 0;
+        vy = 0;
+        onGround = true;
+      }
+      if (character._y < -220) character._y = -220;
 
+      character.style.left = x + 'px';
       character.style.transform = `translateY(${character._y}px)`;
     }
 
-    // animation loop for smooth movement (left/right) even if prediction frames are slower
-    function tick(){
-      // ensure character stays inside stage if resized
+    function tick() {
       x = Math.max(8, Math.min(stage.clientWidth - character.clientWidth - 8, x));
       character.style.left = x + 'px';
       requestAnimationFrame(tick);
     }
 
-    startBtn.addEventListener('click', async ()=>{
+    startBtn.addEventListener('click', async () => {
       startBtn.disabled = true;
       predLabel.textContent = 'loading...';
-      try{
+      try {
         await loadModel();
         await startWebcam();
         running = true;
@@ -195,14 +186,14 @@
         predictionHistory = [];
         predictLoop();
         tick();
-      }catch(err){
+      } catch (err) {
         console.error(err);
         alert('Error starting webcam or loading model: ' + err.message);
         startBtn.disabled = false;
       }
     });
 
-    stopBtn.addEventListener('click', ()=>{
+    stopBtn.addEventListener('click', () => {
       running = false;
       stopBtn.disabled = true;
       startBtn.disabled = false;
@@ -212,20 +203,16 @@
       stopWebcam();
     });
 
-    // handle page resize to keep character in bounds
-    window.addEventListener('resize', ()=>{
+    window.addEventListener('resize', () => {
       x = Math.max(8, Math.min(stage.clientWidth - character.clientWidth - 8, x));
     });
 
-    // accessibility: keyboard fallback
-    window.addEventListener('keydown', (e)=>{
-      if(e.key === 'ArrowLeft'){ handleAction(CLASS_LEFT, 1); }
-      if(e.key === 'ArrowRight'){ handleAction(CLASS_RIGHT, 1); }
-      if(e.key === ' ' || e.key === 'ArrowUp'){ handleAction(CLASS_JUMP, 1); }
-      if(e.key === 'ArrowDown'){ handleAction(CLASS_STAY, 1); }
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') handleAction(CLASS_LEFT, 1);
+      if (e.key === 'ArrowRight') handleAction(CLASS_RIGHT, 1);
+      if (e.key === ' ' || e.key === 'ArrowUp') handleAction(CLASS_JUMP, 1);
+      if (e.key === 'ArrowDown') handleAction(CLASS_STAY, 1);
     });
-
-    // hint: if you replace character image, ensure it's small and transparent background.
   </script>
 </body>
 </html>
